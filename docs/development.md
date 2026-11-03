@@ -2,14 +2,19 @@
 
 ## Setup
 
+[mise](https://mise.jdx.dev) pins Node and wraps the npm scripts:
+
 ```sh
-npm install
-npm run build      # → dist/, then Load unpacked on dist/
-npm run watch      # rebuild on change
-npm run typecheck
-npm test           # see testing.md
-npm run zip        # → pr-versions.zip
+mise install       # Node, from mise.toml
+mise run setup     # npm ci + Playwright's Chromium
+mise run build     # → dist/, then Load unpacked on dist/
+mise run watch     # rebuild on change
+mise run check     # typecheck + unit tests, like CI
+mise run screenshot
+mise run zip       # → pr-versions.zip
 ```
+
+Without mise: Node 22, then `npm ci`, `npx playwright install chromium`, and the same names as `npm run` scripts.
 
 After a rebuild, click reload on the extension card in `chrome://extensions` and reload the PR page.
 

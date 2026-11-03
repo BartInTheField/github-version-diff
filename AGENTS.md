@@ -1,7 +1,8 @@
 # PR Versions for GitHub
 
 A Chrome extension (Manifest V3, TypeScript, esbuild) that adds a version picker to GitHub PRs and Linear Diffs.
-`package.json` lists the commands. The code map is in [docs/development.md](docs/development.md).
+`mise.toml` pins Node and lists the tasks (`mise tasks`); each wraps an npm script. The code map is in
+[docs/development.md](docs/development.md).
 
 ## Before you change code
 
@@ -11,12 +12,12 @@ A Chrome extension (Manifest V3, TypeScript, esbuild) that adds a version picker
 
 ## Proving a change works
 
-A change is done when it is _seen_ in a browser, not only when `npm test` is green.
+A change is done when it is _seen_ in a browser, not only when the tests are green.
 
-1. `npm run typecheck && npm test`.
-2. `npm run screenshot`. It builds `dist/`, loads it into Playwright's Chromium on
+1. `mise run check`.
+2. `mise run screenshot`. It builds `dist/`, loads it into Playwright's Chromium on
    [cli/cli#14768](https://github.com/cli/cli/pull/14768) and writes `docs/images/screenshot-{light,dark}.png`.
-   First run: `npx playwright install chromium`.
+   First run: `mise install && mise run setup`.
 3. **Read both PNGs.** The picker should sit in the toolbar with the popover open, rows v11…v15, and a range on the
    trigger. A missing popover, an error note or a blank frame is a failure, whatever the exit code says.
 4. The README shows these PNGs. Commit them only when the picker's look changed on purpose. Otherwise

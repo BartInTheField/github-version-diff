@@ -34,7 +34,7 @@ profile), opens the Files tab of [cli/cli#14768](https://github.com/cli/cli/pull
 `docs/images/screenshot-light.png` and `screenshot-dark.png`. These are the README screenshots.
 
 ```sh
-npx playwright install chromium   # once
+mise run setup                     # once: npm ci + Playwright's Chromium
 npm run screenshot                                         # cli/cli#14768, headless
 npm run screenshot -- https://github.com/<o>/<r>/pull/<n>  # another public PR
 npm run screenshot -- --headed                             # watch it run

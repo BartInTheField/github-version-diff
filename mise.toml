@@ -1,0 +1,34 @@
+[tools]
+node = "22.22.3"
+
+[tasks.setup]
+description = "Install npm dependencies and Playwright's Chromium"
+run = ["npm ci", "npx playwright install chromium"]
+
+[tasks.build]
+description = "Build the extension into dist/"
+run = "npm run build"
+
+[tasks.watch]
+description = "Rebuild dist/ on every change"
+run = "npm run watch"
+
+[tasks.test]
+description = "Unit tests against the recorded fixtures"
+run = "npm test"
+
+[tasks.typecheck]
+description = "TypeScript, no emit"
+run = "npm run typecheck"
+
+[tasks.check]
+description = "Typecheck and unit tests, like CI"
+depends = ["typecheck", "test"]
+
+[tasks.screenshot]
+description = "Load dist/ into Chromium on cli/cli#14768 and save the README screenshots"
+run = "npm run screenshot --"
+
+[tasks.zip]
+description = "Build pr-versions.zip"
+run = "npm run zip"
