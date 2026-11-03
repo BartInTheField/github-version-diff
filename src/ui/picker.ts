@@ -3,7 +3,7 @@ import { cachedVersions, checkRange, loadVersions, type RangeCheck } from '../lo
 import { getLastViewed, setLastViewed } from '../storage';
 import type { PrRef, Version, VersionList } from '../types';
 import { defaultRange, newSinceLastViewed, sameSha } from '../versions';
-import { createShadowHost, h, releaseHost, shortSha } from './dom';
+import { applyTheme, createShadowHost, h, releaseHost, shortSha, type Site } from './dom';
 import { findMountTarget } from './mount-targets';
 import { canPickFrom, canPickTo, rangeLabel, type Range } from './range';
 
@@ -48,8 +48,8 @@ function rangeStatus(check: RangeCheck): HTMLElement | undefined {
  */
 export type Placement = 'toolbar' | 'floating' | 'corner-left';
 
-export function mountPicker(pr: PrRef, key: string, placement: Placement = 'toolbar'): Picker {
-  const { host, root } = createShadowHost();
+export function mountPicker(pr: PrRef, key: string, site: Site, placement: Placement = 'toolbar'): Picker {
+  const { host, root } = createShadowHost(site);
   const found = placement === 'toolbar' ? findMountTarget() : undefined;
   if (found) {
     host.setAttribute('data-mount', found.target.name);
@@ -277,6 +277,7 @@ export function mountPicker(pr: PrRef, key: string, placement: Placement = 'tool
     }
   };
   const show = () => {
+    applyTheme(host);
     popover.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     place();
@@ -308,6 +309,8 @@ export function mountPicker(pr: PrRef, key: string, placement: Placement = 'tool
     close();
   });
 
+  // Sample the page once we are in the DOM and laid out.
+  requestAnimationFrame(() => applyTheme(host));
   void load();
 
   return {

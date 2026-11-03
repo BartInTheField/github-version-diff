@@ -42,6 +42,7 @@ The toolbar button shows the current range (`v3 → v5`, or **All changes** for 
 - **Open diff ↗** opens GitHub's compare view: `A..B` between versions, or `base...B` from Base.
 - **⚠ This range includes a rebase:** the compare view will mix in base-branch changes. Hover to see which files changed only on the base branch.
 - **No longer available:** GitHub garbage-collected an old force-pushed commit.
+- **Looks native on each site:** on GitHub it uses Primer's own colour variables, so it follows every GitHub theme (light, dark, dimmed, high contrast). On Linear it takes the colours and font of the page behind it, plus Linear's indigo accent and compact menu style, so custom Linear themes work too.
 
 ## Known limitations
 

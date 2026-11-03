@@ -17,7 +17,7 @@ function sync(): void {
   }
   if (picker && picker.key === page.key && picker.host.isConnected) return;
   picker?.destroy();
-  picker = mountPicker(page.pr, page.key, page.site === 'github' ? 'toolbar' : 'corner-left');
+  picker = mountPicker(page.pr, page.key, page.site, page.site === 'github' ? 'toolbar' : 'corner-left');
 }
 
 let scheduled = false;
