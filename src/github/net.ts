@@ -55,6 +55,11 @@ export async function directFetch(req: NetRequest): Promise<NetResponse> {
 export async function githubFetch(req: NetRequest): Promise<NetResponse> {
   if (!isGithubUrl(req.url)) throw new Error(`Not a github.com URL: ${req.url}`);
   if (location.origin === GITHUB) return directFetch(req);
-  const res = (await chrome.runtime.sendMessage({ type: PROXY_MESSAGE, req })) as NetResponse | undefined;
-  return res ?? { ok: false, status: 0, contentType: '', text: '', error: 'network' };
+  try {
+    const res = (await chrome.runtime.sendMessage({ type: PROXY_MESSAGE, req })) as NetResponse | undefined;
+    return res ?? { ok: false, status: 0, contentType: '', text: '', error: 'network' };
+  } catch {
+    // "Extension context invalidated": the extension was reloaded under this tab.
+    return { ok: false, status: 0, contentType: '', text: '', error: 'network' };
+  }
 }
