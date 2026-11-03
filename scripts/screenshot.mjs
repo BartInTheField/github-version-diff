@@ -11,6 +11,7 @@ const prUrl = (args.find((a) => a.startsWith('https://')) ?? 'https://github.com
 const extension = resolve('dist');
 const out = resolve('docs/images');
 mkdirSync(out, { recursive: true });
+mkdirSync(resolve('docs/store'), { recursive: true });
 
 const context = await chromium.launchPersistentContext(join(tmpdir(), `prv-profile-${Date.now()}`), {
   channel: 'chromium', // the full Chromium build: headless_shell can't load extensions
@@ -43,6 +44,12 @@ const shoot = async (scheme) => {
     clip: { x: 0, y: top, width: 1280, height: Math.min(800 - top, box.y + box.height - top + 40) },
   });
   console.log(`${scheme}: mounted at ${mount} → ${file}`);
+  if (scheme === 'light') {
+    // The Chrome Web Store wants exactly 1280×800, so this one is the whole viewport at CSS scale.
+    const store = resolve('docs/store/screenshot-1280x800.png');
+    await page.screenshot({ path: store, scale: 'css' });
+    console.log(`store: ${store}`);
+  }
   await page.close();
 };
 

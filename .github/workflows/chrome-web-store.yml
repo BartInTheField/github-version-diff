@@ -1,0 +1,80 @@
+name: Chrome Web Store
+
+# Sends a GitHub release to the Chrome Web Store for review. Manual on purpose: every push to main is a release, and
+# each store submission sits in review for days. Setup: docs/chrome-web-store.md#publish-from-ci.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (empty = latest release)
+        required: false
+      cancel_pending:
+        description: If a submission is still in review, cancel it and send this one instead
+        type: boolean
+        default: false
+
+concurrency:
+  group: chrome-web-store
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # GitHub's OIDC token, exchanged for a Google access token
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    env:
+      ITEM: https://chromewebstore.googleapis.com/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}
+      UPLOAD: https://chromewebstore.googleapis.com/upload/v2/publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_ITEM_ID }}
+    steps:
+      - name: Download the store zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          tag=${TAG:-$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "pr-versions_${tag}_chrome-web-store.zip" --output store.zip
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+
+      - name: Upload and submit for review
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          CANCEL_PENDING: ${{ inputs.cancel_pending }}
+        run: |
+          api() { curl -sS --fail-with-body -H "Authorization: Bearer $TOKEN" "$@"; }
+
+          # A new upload would replace the version that's waiting in review, and restart the wait.
+          if [ "$(api "$ITEM:fetchStatus" | jq -r '.submittedItemRevisionStatus.state // empty')" = PENDING_REVIEW ]; then
+            if [ "$CANCEL_PENDING" != true ]; then
+              echo "::error::A submission is still in review. Wait for it, or rerun with the cancel option ticked."
+              exit 1
+            fi
+            api -X POST "$ITEM:cancelSubmission"
+          fi
+
+          upload=$(api -X POST -T store.zip "$UPLOAD:upload")
+          echo "$upload"
+          state=$(jq -r .uploadState <<<"$upload")
+          for _ in $(seq 30); do
+            [ "$state" = IN_PROGRESS ] || break
+            sleep 10
+            state=$(api "$ITEM:fetchStatus" | jq -r .lastAsyncUploadState)
+          done
+          if [ "$state" != SUCCEEDED ]; then
+            echo "::error::Upload ended as $state"
+            exit 1
+          fi
+
+          published=$(api -X POST "$ITEM:publish")
+          echo "$published"
+          echo "Submitted \`$TAG\` for review: $(jq -r .state <<<"$published")" >> "$GITHUB_STEP_SUMMARY"

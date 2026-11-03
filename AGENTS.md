@@ -21,7 +21,7 @@ A change is done when it is _seen_ in a browser, not only when the tests are gre
 3. **Read both PNGs.** The picker should sit in the toolbar with the popover open, rows v11…v15, and a range on the
    trigger. A missing popover, an error note or a blank frame is a failure, whatever the exit code says.
 4. The README shows these PNGs. Commit them only when the picker's look changed on purpose. Otherwise
-   `git checkout docs/images` to drop the re-render noise.
+   `git checkout docs/images docs/store` to drop the re-render noise.
 
 Flags, the reference PR, and what the output means: [docs/testing.md](docs/testing.md#browser-run-and-screenshots).
 

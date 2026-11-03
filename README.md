@@ -62,6 +62,8 @@ Click the picker button (`v3 → v5`, or **All changes**), choose a **from** and
 - [Known limitations](docs/limitations.md): what the extension can't do (yet)
 - [Development](docs/development.md): building from source, the code map, releases
 - [Testing](docs/testing.md): unit tests, fixtures, and the manual test checklist
+- [Privacy](docs/privacy.md): what the extension stores and sends
+- [Chrome Web Store](docs/chrome-web-store.md): publishing a release and the listing text
 
 Found a bug or have an idea? [Open an issue](https://github.com/BartInTheField/github-version-diff/issues/new).
 

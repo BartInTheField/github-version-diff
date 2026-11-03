@@ -42,3 +42,5 @@ CalVer: `YYYY.MM.DD.N`, where N counts the releases of that UTC day.
 - The tag and the version Chrome shows (`version_name`) are e.g. `2026.11.03.1`.
 - The manifest `version` drops leading zeros (`2026.11.3.1`), because Chrome requires plain integers.
 - Local builds are `0.0.0` / `dev`.
+- Each release has two zips: one with a `pr-versions/` folder for Load unpacked, and a `_chrome-web-store` one with
+  the manifest at the root, for the [store](chrome-web-store.md).
