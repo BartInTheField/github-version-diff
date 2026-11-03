@@ -1,0 +1,316 @@
+:host {
+  --prv-bg: #ffffff;
+  --prv-bg-subtle: #f6f8fa;
+  --prv-fg: #1f2328;
+  --prv-muted: #59636e;
+  --prv-border: #d1d9e0;
+  --prv-accent: #0969da;
+  --prv-accent-fg: #ffffff;
+  --prv-warn: #9a6700;
+  --prv-warn-bg: #fff8c5;
+  --prv-danger: #d1242f;
+  --prv-from: rgba(255, 129, 130, 0.16);
+  --prv-to: rgba(74, 194, 107, 0.16);
+  --prv-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+  all: initial;
+  display: inline-flex;
+  font: 12px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  color: var(--prv-fg);
+  max-width: 100%;
+}
+:host([data-theme="dark"]) {
+  --prv-bg: #0d1117;
+  --prv-bg-subtle: #151b23;
+  --prv-fg: #f0f6fc;
+  --prv-muted: #9198a1;
+  --prv-border: #3d444d;
+  --prv-accent: #4493f8;
+  --prv-accent-fg: #ffffff;
+  --prv-warn: #d29922;
+  --prv-warn-bg: rgba(187, 128, 9, 0.15);
+  --prv-danger: #f85149;
+  --prv-from: rgba(248, 81, 73, 0.15);
+  --prv-to: rgba(46, 160, 67, 0.15);
+  --prv-shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
+}
+:host(.prv-corner-left) {
+  /* Linear: right of the "?" help button in the bottom-left corner, clear of the AI bar. */
+  position: fixed;
+  left: 60px;
+  bottom: 8px;
+  z-index: 100;
+}
+:host(.prv-floating) {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 100;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.bar.floating {
+  padding: 6px;
+  background: var(--prv-bg);
+  border: 1px solid var(--prv-border);
+  border-radius: 8px;
+  box-shadow: var(--prv-shadow);
+}
+.bar.corner-left .trigger {
+  box-shadow: var(--prv-shadow);
+}
+.bar.corner-left .status {
+  background: var(--prv-bg);
+  border-radius: 6px;
+  padding: 0 6px;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Trigger, styled like GitHub's toolbar buttons. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--prv-fg);
+  background: var(--prv-bg-subtle);
+  border: 1px solid var(--prv-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.trigger:hover:not(:disabled) {
+  border-color: var(--prv-muted);
+}
+.trigger:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.trigger .icon,
+.trigger .caret {
+  color: var(--prv-muted);
+}
+.count {
+  background: var(--prv-accent);
+  color: var(--prv-accent-fg);
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Popover */
+.popover {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  background: var(--prv-bg);
+  color: var(--prv-fg);
+  border: 1px solid var(--prv-border);
+  border-radius: 12px;
+  box-shadow: var(--prv-shadow);
+  overflow: hidden;
+  font-size: 13px;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--prv-border);
+}
+.title {
+  font-weight: 600;
+}
+.hint {
+  color: var(--prv-muted);
+  font-size: 12px;
+}
+.rows {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.row {
+  display: grid;
+  grid-template-columns: 40px 40px 1fr;
+  align-items: stretch;
+  border-bottom: 1px solid var(--prv-border);
+}
+.row:last-child {
+  border-bottom: none;
+}
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+.cell.from {
+  background: var(--prv-from);
+}
+.cell.to {
+  background: var(--prv-to);
+}
+.cell.off {
+  cursor: default;
+}
+.cell input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: inherit;
+}
+.dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--prv-muted);
+  background: var(--prv-bg);
+  box-sizing: border-box;
+}
+.cell.off .dot {
+  opacity: 0.35;
+}
+.cell input:checked + .dot {
+  border: 5px solid var(--prv-accent);
+  background: #fff;
+  opacity: 1;
+}
+.cell input:focus-visible + .dot {
+  outline: 2px solid var(--prv-accent);
+  outline-offset: 2px;
+}
+.cell:not(.off):hover .dot {
+  border-color: var(--prv-accent);
+}
+.info {
+  padding: 8px 12px;
+  min-width: 0;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.name {
+  font-weight: 600;
+}
+code {
+  font: 12px ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.meta {
+  color: var(--prv-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.copy {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--prv-muted);
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.copy:hover {
+  color: var(--prv-fg);
+  background: var(--prv-bg-subtle);
+}
+.tag {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 7px;
+  border-radius: 10px;
+  border: 1px solid var(--prv-border);
+  color: var(--prv-muted);
+  white-space: nowrap;
+}
+.tag.accent {
+  border-color: var(--prv-accent);
+  color: var(--prv-accent);
+}
+.tag + .tag {
+  margin-left: 4px;
+}
+.footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--prv-border);
+  background: var(--prv-bg-subtle);
+}
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.note.warn {
+  color: var(--prv-warn);
+  cursor: help;
+}
+.btn {
+  font: inherit;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--prv-border);
+  background: var(--prv-bg-subtle);
+  color: var(--prv-fg);
+  padding: 4px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn.primary {
+  background: var(--prv-accent);
+  border-color: var(--prv-accent);
+  color: var(--prv-accent-fg);
+  margin-left: auto;
+}
+.btn.link {
+  background: none;
+  border: none;
+  color: var(--prv-accent);
+  padding: 0 4px;
+}
+.btn:focus-visible,
+.trigger:focus-visible,
+.copy:focus-visible {
+  outline: 2px solid var(--prv-accent);
+  outline-offset: 1px;
+}
+.status {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.status:empty {
+  display: none;
+}
+.muted {
+  color: var(--prv-muted);
+}
+.error {
+  color: var(--prv-danger);
+}

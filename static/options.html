@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PR Versions options</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 16px; min-width: 420px; }
+      h1 { font-size: 16px; margin: 0 0 8px; }
+      p { margin: 0 0 12px; }
+      input { width: 100%; box-sizing: border-box; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 6px; }
+      .row { display: flex; gap: 8px; margin-top: 8px; }
+      .ok { color: #1a7f37; } .err { color: #d1242f; }
+      @media (prefers-color-scheme: dark) { .ok { color: #3fb950; } .err { color: #f85149; } }
+      code { font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>GitHub token (optional)</h1>
+    <p>
+      Without a token, the extension reads versions (one per push) from github.com pages using your normal session.
+      With a token, it uses the GitHub API instead. This gives an exact rebase check and still works when the pages can't be read.
+    </p>
+    <p>
+      Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>
+      with read-only <code>Pull requests</code> and <code>Contents</code> access to the repositories you review.
+      The token is stored only in this browser (<code>chrome.storage.local</code>).
+    </p>
+    <form id="form">
+      <input id="pat" type="password" autocomplete="off" placeholder="github_pat_…" />
+      <div class="row">
+        <button type="submit">Save</button>
+        <button type="button" id="clear">Remove token</button>
+      </div>
+    </form>
+    <p id="status" role="status"></p>
+    <script src="options.js"></script>
+  </body>
+</html>

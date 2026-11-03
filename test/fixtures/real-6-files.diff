@@ -1,0 +1,231 @@
+diff --git a/go.mod b/go.mod
+index b1657bd63bd..7b43c128f84 100644
+--- a/go.mod
++++ b/go.mod
+@@ -20,7 +20,7 @@ require (
+ 	github.com/charmbracelet/x/ansi v0.11.9
+ 	github.com/cli/go-gh/v2 v2.17.0
+ 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
+-	github.com/cli/oauth v1.2.3-0.20260914234613-cde372eeffd4
++	github.com/cli/oauth v1.3.0
+ 	github.com/cli/safeexec v1.0.1
+ 	github.com/cpuguy83/go-md2man/v2 v2.0.7
+ 	github.com/creack/pty v1.1.24
+diff --git a/go.sum b/go.sum
+index 808f5bc3e62..45be41f18f4 100644
+--- a/go.sum
++++ b/go.sum
+@@ -144,8 +144,8 @@ github.com/cli/go-gh/v2 v2.17.0 h1:F24s1Ow/6pgWO0FXXSTi7l4YLkcuS94XPv7npEGkrQc=
+ github.com/cli/go-gh/v2 v2.17.0/go.mod h1:bc2VCe0OUSOuhDz5HeQrA7RAtc/d3PtyGogBXHbcp1o=
+ github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24 h1:QDrhR4JA2n3ij9YQN0u5ZeuvRIIvsUGmf5yPlTS0w8E=
+ github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24/go.mod h1:rr9GNING0onuVw8MnracQHn7PcchnFlP882Y0II2KZk=
+-github.com/cli/oauth v1.2.3-0.20260914234613-cde372eeffd4 h1:Cp3FHONVUKS7aA8y0MORVvisv70Z1TVtap4C1Fqgy/s=
+-github.com/cli/oauth v1.2.3-0.20260914234613-cde372eeffd4/go.mod h1:h0lVJ2xkpgc0WGjM6KHPKb0T2D+YUfsz3GbRTPandyg=
++github.com/cli/oauth v1.3.0 h1:n+g95m4ht5dAlG1XGMcIT+oU+dbJZVr80fuOf5lOHUM=
++github.com/cli/oauth v1.3.0/go.mod h1:h0lVJ2xkpgc0WGjM6KHPKb0T2D+YUfsz3GbRTPandyg=
+ github.com/cli/safeexec v1.0.1 h1:e/C79PbXF4yYTN/wauC4tviMxEV13BwljGj0N9j+N00=
+ github.com/cli/safeexec v1.0.1/go.mod h1:Z/D4tTN8Vs5gXYHDCbaM1S/anmEDnJb1iW0+EJ5zx3Q=
+ github.com/cli/shurcooL-graphql v0.0.4 h1:6MogPnQJLjKkaXPyGqPRXOI2qCsQdqNfUY1QSJu2GuY=
+diff --git a/internal/authflow/refresh.go b/internal/authflow/refresh.go
+index ed19ac6a5de..1fae9380237 100644
+--- a/internal/authflow/refresh.go
++++ b/internal/authflow/refresh.go
+@@ -41,8 +41,7 @@ func NewTokenRefresher(httpClient *http.Client) *TokenRefresher {
+ // Refresh exchanges refreshToken for a renewed credential on hostname. A refresh token the server rejects surfaces as
+ // an error wrapping gh.ErrRefreshTokenInvalid, so callers can distinguish an unusable refresh token from a transient
+ // failure without depending on the underlying OAuth library. When the server omits a new refresh token, the returned
+-// credential's RefreshToken is left empty rather than reusing refreshToken, so the response is reported exactly as
+-// received.
++// credential keeps refreshToken, since RFC 6749 treats the previous refresh token as still valid in that case.
+ func (r *TokenRefresher) Refresh(refreshToken, hostname string) (gh.RefreshableCredential, error) {
+ 	host, err := oauth.NewGitHubHost(ghinstance.HostPrefix(hostname))
+ 	if err != nil {
+@@ -88,14 +87,14 @@ func refreshableCredentialFromAccessToken(token *oauthapi.AccessToken, requested
+ 	credential := gh.RefreshableCredential{
+ 		AccessToken:           token.Token,
+ 		RefreshToken:          token.RefreshToken,
+-		ExpiresIn:             token.ExpiresIn,
+-		RefreshTokenExpiresIn: token.RefreshTokenExpiresIn,
++		ExpiresIn:             int(token.ExpiresIn / time.Second),
++		RefreshTokenExpiresIn: int(token.RefreshTokenExpiresIn / time.Second),
+ 	}
+ 	if token.ExpiresIn > 0 {
+-		credential.ExpiresAt = new(requestedAt.Add(time.Duration(token.ExpiresIn) * time.Second))
++		credential.ExpiresAt = new(requestedAt.Add(token.ExpiresIn))
+ 	}
+ 	if token.RefreshTokenExpiresIn > 0 {
+-		credential.RefreshTokenExpiresAt = new(requestedAt.Add(time.Duration(token.RefreshTokenExpiresIn) * time.Second))
++		credential.RefreshTokenExpiresAt = new(requestedAt.Add(token.RefreshTokenExpiresIn))
+ 	}
+ 	return credential
+ }
+diff --git a/internal/authflow/refresh_test.go b/internal/authflow/refresh_test.go
+index 3204620bb25..bc366e1cec9 100644
+--- a/internal/authflow/refresh_test.go
++++ b/internal/authflow/refresh_test.go
+@@ -107,9 +107,9 @@ func TestTokenRefresherRefreshOmittedRefreshToken(t *testing.T) {
+ 	credential, err := refresher.Refresh("ghr_OLD", "github.com")
+ 	require.NoError(t, err)
+ 
+-	// When the server omits a refresh token we report it as received rather than reusing the old one.
++	// RFC 6749 lets a server omit a new refresh token, meaning the previous one stays valid, so the old one is reused.
+ 	require.Equal(t, "gho_NEW", credential.AccessToken)
+-	require.Empty(t, credential.RefreshToken)
++	require.Equal(t, "ghr_OLD", credential.RefreshToken)
+ }
+ 
+ func TestTokenRefresherRefreshRejected(t *testing.T) {
+@@ -134,8 +134,8 @@ func TestAuthResultFromToken(t *testing.T) {
+ 		token := &oauthapi.AccessToken{
+ 			Token:                 "gho_NEW",
+ 			RefreshToken:          "ghr_NEW",
+-			ExpiresIn:             28800,
+-			RefreshTokenExpiresIn: 15897600,
++			ExpiresIn:             28800 * time.Second,
++			RefreshTokenExpiresIn: 15897600 * time.Second,
+ 		}
+ 
+ 		result := authResultFromToken(token, "monalisa", requestedAt)
+@@ -155,7 +155,7 @@ func TestAuthResultFromToken(t *testing.T) {
+ 	t.Run("without refresh token yields a plain token", func(t *testing.T) {
+ 		token := &oauthapi.AccessToken{
+ 			Token:     "gho_NEW",
+-			ExpiresIn: 28800,
++			ExpiresIn: 28800 * time.Second,
+ 		}
+ 
+ 		result := authResultFromToken(token, "monalisa", requestedAt)
+diff --git a/pkg/cmd/status/status.go b/pkg/cmd/status/status.go
+index e3b49be2286..6c6daedb8a8 100644
+--- a/pkg/cmd/status/status.go
++++ b/pkg/cmd/status/status.go
+@@ -675,7 +675,8 @@ func statusRun(opts *StatusOptions) error {
+ 	halfWidth := (fullWidth / 2) - 2
+ 
+ 	idStyle := cs.Cyan
+-	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
++	// Lip Gloss v2 counts the right border within Width, so add a cell to keep the content as wide as the right half.
++	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth + 1).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
+ 	rightHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0)
+ 
+ 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
+diff --git a/pkg/cmd/status/status_test.go b/pkg/cmd/status/status_test.go
+index 69f6e3c3b9f..e3f6d02dce9 100644
+--- a/pkg/cmd/status/status_test.go
++++ b/pkg/cmd/status/status_test.go
+@@ -109,7 +109,7 @@ func TestStatusRun(t *testing.T) {
+ 					httpmock.StringResponse(`[]`))
+ 			},
+ 			opts:    &StatusOptions{},
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nReview Requests                      │ Mentions                              \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nRepository Activity\nNothing here ^_^\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nReview Requests                       │ Mentions                              \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nRepository Activity\nNothing here ^_^\n\n",
+ 		},
+ 		{
+ 			name: "notifications 404 is tolerated",
+@@ -128,7 +128,7 @@ func TestStatusRun(t *testing.T) {
+ 					httpmock.StringResponse(`[]`))
+ 			},
+ 			opts:    &StatusOptions{},
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nReview Requests                      │ Mentions                              \nNothing here ^_^                     │ Nothing here ^_^                      \n                                     │                                       \nRepository Activity\nNothing here ^_^\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nReview Requests                       │ Mentions                              \nNothing here ^_^                      │ Nothing here ^_^                      \n                                      │                                       \nRepository Activity\nNothing here ^_^\n\n",
+ 		},
+ 		{
+ 			name: "something",
+@@ -162,7 +162,7 @@ func TestStatusRun(t *testing.T) {
+ 					httpmock.FileResponse("./fixtures/events.json"))
+ 			},
+ 			opts:    &StatusOptions{},
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar         │ cli/cli#1096               @jillval...\nrpd/todo#50           Welcome        │ vilmibm/gh-screensaver#15  a messag...\nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\ncli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...\ncli/cli#5300          new issue                     Terminal bell when a runn...\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar          │ cli/cli#1096               @jillval...\nrpd/todo#50           Welcome party...│ vilmibm/gh-screensaver#15  a messag...\ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\ncli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...\ncli/cli#5300          new issue                     Terminal bell when a runn...\n\n",
+ 		},
+ 		{
+ 			name: "exclude a repository",
+@@ -197,7 +197,7 @@ func TestStatusRun(t *testing.T) {
+ 			},
+ 			// NOTA BENE: you'll see cli/cli in search results because that happens
+ 			// server side and the fixture doesn't account for that
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar         │ vilmibm/gh-screensaver#15  a messag...\nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...\nvilmibm/testing#1234  Foobar          │ vilmibm/gh-screensaver#15  a messag...\nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
+ 		},
+ 		{
+ 			name: "exclude repositories",
+@@ -223,7 +223,7 @@ func TestStatusRun(t *testing.T) {
+ 			},
+ 			// NOTA BENE: you'll see cli/cli in search results because that happens
+ 			// server side and the fixture doesn't account for that
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ vilmibm/gh-screensaver#15  a messag...\nvilmibm/testing#1234  Foobar         │                                       \nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ vilmibm/gh-screensaver#15  a messag...\nvilmibm/testing#1234  Foobar          │                                       \nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\n\n",
+ 		},
+ 		{
+ 			name: "filter to an org",
+@@ -253,7 +253,7 @@ func TestStatusRun(t *testing.T) {
+ 			opts: &StatusOptions{
+ 				Org: "rpd",
+ 			},
+-			wantOut: "Assigned Issues                      │ Assigned Pull Requests                \nvilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    \ngarden...                            │ cli/cli#4768  Issue Frecency          \nrpd/todo#514            Reducing     │                                       \nzo...                                │                                       \nvilmibm/testing#74      welp         │                                       \nadreyer/arkestrator#22  complete     │                                       \nmo...                                │                                       \n                                     │                                       \nReview Requests                      │ Mentions                              \ncli/cli#5272          Pin extensions │ rpd/todo#110  hello @jillvalentine ...\nvilmibm/testing#1234  Foobar         │                                       \nrpd/todo#50           Welcome        │                                       \nparty...                             │                                       \ncli/cli#4671          This pull      │                                       \nreq...                               │                                       \nrpd/todo#49           Haircut for    │                                       \nLeon                                 │                                       \n                                     │                                       \nRepository Activity\nrpd/todo#5326  new PR  Only write UTF-8 BOM on Windows where it is needed\n\n",
++			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          \ncli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    \nrpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          \nvilmibm/testing#74      welp          │                                       \nadreyer/arkestrator#22  complete mo...│                                       \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272          Pin extensions  │ rpd/todo#110  hello @jillvalentine ...\nvilmibm/testing#1234  Foobar          │                                       \nrpd/todo#50           Welcome party...│                                       \ncli/cli#4671          This pull req...│                                       \nrpd/todo#49           Haircut for Leon│                                       \n                                      │                                       \nRepository Activity\nrpd/todo#5326  new PR  Only write UTF-8 BOM on Windows where it is needed\n\n",
+ 		},
+ 		{
+ 			name: "forbidden errors",
+@@ -298,13 +298,13 @@ func TestStatusRun(t *testing.T) {
+ 			},
+ 			opts: &StatusOptions{},
+ 			wantOut: heredoc.Doc(`
+-				Assigned Issues                      │ Assigned Pull Requests                
+-				vilmibm/testing#157  yolo            │ cli/cli#5272  Pin extensions          
+-				                                     │                                       
+-				Review Requests                      │ Mentions                              
+-				cli/cli#5272  Pin extensions         │ cli/cli#1096               @jillval...
+-				                                     │ vilmibm/gh-screensaver#15  a messag...
+-				                                                                             
++				Assigned Issues                       │ Assigned Pull Requests                
++				vilmibm/testing#157  yolo             │ cli/cli#5272  Pin extensions          
++				                                      │                                       
++				Review Requests                       │ Mentions                              
++				cli/cli#5272  Pin extensions          │ cli/cli#1096               @jillval...
++				                                      │ vilmibm/gh-screensaver#15  a messag...
++				                                                                              
+ 				Repository Activity
+ 				rpd/todo#5326         new PR                        Only write UTF-8 BOM on W...
+ 				vilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...
+@@ -350,26 +350,20 @@ func TestStatusRun(t *testing.T) {
+ 			},
+ 			opts: &StatusOptions{},
+ 			wantOut: heredoc.Doc(`
+-				Assigned Issues                      │ Assigned Pull Requests                
+-				vilmibm/testing#157     yolo         │ cli/cli#5272  Pin extensions          
+-				cli/cli#3223            Repo         │ rpd/todo#73   Board up RPD windows    
+-				garden...                            │ cli/cli#4768  Issue Frecency          
+-				rpd/todo#514            Reducing     │                                       
+-				zo...                                │                                       
+-				vilmibm/testing#74      welp         │                                       
+-				adreyer/arkestrator#22  complete     │                                       
+-				mo...                                │                                       
+-				                                     │                                       
+-				Review Requests                      │ Mentions                              
+-				cli/cli#5272          Pin extensions │ rpd/todo#110               hello @j...
+-				vilmibm/testing#1234  Foobar         │ cli/cli#1096               @jillval...
+-				rpd/todo#50           Welcome        │ vilmibm/gh-screensaver#15  a messag...
+-				party...                             │                                       
+-				cli/cli#4671          This pull      │                                       
+-				req...                               │                                       
+-				rpd/todo#49           Haircut for    │                                       
+-				Leon                                 │                                       
+-				                                     │                                       
++				Assigned Issues                       │ Assigned Pull Requests                
++				vilmibm/testing#157     yolo          │ cli/cli#5272  Pin extensions          
++				cli/cli#3223            Repo garden...│ rpd/todo#73   Board up RPD windows    
++				rpd/todo#514            Reducing zo...│ cli/cli#4768  Issue Frecency          
++				vilmibm/testing#74      welp          │                                       
++				adreyer/arkestrator#22  complete mo...│                                       
++				                                      │                                       
++				Review Requests                       │ Mentions                              
++				cli/cli#5272          Pin extensions  │ rpd/todo#110               hello @j...
++				vilmibm/testing#1234  Foobar          │ cli/cli#1096               @jillval...
++				rpd/todo#50           Welcome party...│ vilmibm/gh-screensaver#15  a messag...
++				cli/cli#4671          This pull req...│                                       
++				rpd/todo#49           Haircut for Leon│                                       
++				                                      │                                       
+ 				Repository Activity
+ 				rpd/todo#5326         new PR                        Only write UTF-8 BOM on W...
+ 				vilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...

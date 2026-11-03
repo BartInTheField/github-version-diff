@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "PR Versions for GitHub",
+  "version": "0.0.0",
+  "description": "Compare any two versions of a GitHub pull request, including across force-pushes. Works on GitHub and Linear Diffs.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*",
+        "https://linear.app/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  }
+}
