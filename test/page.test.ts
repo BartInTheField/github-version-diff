@@ -24,6 +24,14 @@ describe('detectPage', () => {
     expect(detectPage(new URL('https://linear.app/acme/review/abc123'), d)?.pr.number).toBe(9);
   });
 
+  it('reads the PR chip on workspace-scoped review URLs (recorded markup)', () => {
+    const d = doc(`<div data-menu-open="false"><button type="button"
+      aria-label="acme/app#9337, pull request actions" class="sx-3nfvp2"></button></div>
+      <button aria-label="Pull request menu"></button>`);
+    const page = detectPage(new URL('https://linear.app/acme/review/fix-something-cfebda80434c/review'), d);
+    expect(page).toMatchObject({ pr: { owner: 'acme', repo: 'app', number: 9337 }, site: 'linear' });
+  });
+
   it('ignores other Linear pages, even with PR links', () => {
     const d = doc('<a href="https://github.com/o/r/pull/9">PR</a>');
     expect(detectPage(new URL('https://linear.app/acme/issue/ENG-1'), d)).toBeUndefined();
